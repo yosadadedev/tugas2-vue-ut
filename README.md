@@ -21,6 +21,8 @@ Aplikasi web sederhana berbasis **Vue.js 2** untuk membantu proses pemesanan dan
 
 Data tidak diambil dari database. Data berasal dari *dummy data* `dataBahanAjar.js` yang disalin ke masing-masing file logika Vue.
 
+🌐 **Live demo:** [tugas2-vue-ut-yosada.netlify.app](https://tugas2-vue-ut-yosada.netlify.app)
+
 ---
 
 ## Tampilan Aplikasi
@@ -37,6 +39,10 @@ Data tidak diambil dari database. Data berasal dari *dummy data* `dataBahanAjar.
 ---
 
 ## Cara Menjalankan
+
+**Online:** buka https://tugas2-vue-ut-yosada.netlify.app
+
+**Lokal:**
 
 1. Pastikan komputer terhubung ke internet karena Vue.js dimuat dari CDN.
 2. Buka file `index.html` langsung di browser (Chrome, Firefox, Edge, atau Safari).
