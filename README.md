@@ -23,6 +23,19 @@ Data tidak diambil dari database. Data berasal dari *dummy data* `dataBahanAjar.
 
 ---
 
+## Tampilan Aplikasi
+
+### Beranda (`index.html`)
+![Tampilan Beranda](img/ss-beranda.png)
+
+### Stok Bahan Ajar (`stok.html`)
+![Tampilan Stok Bahan Ajar](img/ss-stock-bahan-ajar.png)
+
+### Tracking Delivery Order (`tracking.html`)
+![Tampilan Tracking DO](img/ss-tracking-do.png)
+
+---
+
 ## Cara Menjalankan
 
 1. Pastikan komputer terhubung ke internet karena Vue.js dimuat dari CDN.
@@ -47,6 +60,7 @@ tugas2-vue-ut/
 ├─ js/
 │  ├─ stok-app.js      ← Logika Vue untuk stok.html
 │  └─ tracking-app.js  ← Logika Vue untuk tracking.html
+├─ img/               ← Screenshot tampilan aplikasi untuk README
 ├─ dataBahanAjar.js    ← Template dummy data asli dari soal (acuan, tidak dimuat)
 └─ README.md
 ```
