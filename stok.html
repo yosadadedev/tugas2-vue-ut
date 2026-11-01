@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SITTA UT - Stok Bahan Ajar</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <a href="index.html" class="brand"><span class="brand-logo">UT</span> SITTA</a>
+      <div class="nav-menu">
+        <a href="index.html">Beranda</a>
+        <a href="stok.html" class="aktif">Stok Bahan Ajar</a>
+        <a href="tracking.html">Tracking DO</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="app" class="container" v-cloak>
+    <h1 class="judul-halaman">Stok Bahan Ajar</h1>
+    <p class="sub-judul">Daftar stok bahan ajar untuk seluruh UT-Daerah.</p>
+
+    <!-- Ringkasan status stok (computed: ringkasan) -->
+    <section class="ringkasan">
+      <div class="ringkasan-item">
+        <div class="label">Total Bahan Ajar</div>
+        <div class="angka" v-text="stok.length"></div>
+      </div>
+      <div class="ringkasan-item aman">
+        <div class="label">&#10004; Aman</div>
+        <div class="angka" v-text="ringkasan.aman"></div>
+      </div>
+      <div class="ringkasan-item menipis">
+        <div class="label">&#9888; Menipis</div>
+        <div class="angka" v-text="ringkasan.menipis"></div>
+      </div>
+      <div class="ringkasan-item kosong">
+        <div class="label">&#10006; Kosong</div>
+        <div class="angka" v-text="ringkasan.kosong"></div>
+      </div>
+    </section>
+
+    <!-- ================= FILTER & SORT ================= -->
+    <section class="kartu">
+      <h2>Filter &amp; Urutkan</h2>
+      <div class="filter-bar">
+        <div class="field">
+          <label for="cari">Cari kode / judul</label>
+          <input id="cari" type="search" v-model.trim="filter.kataKunci" placeholder="mis. EKMA4116">
+        </div>
+
+        <div class="field">
+          <label for="f-upbjj">UT-Daerah</label>
+          <select id="f-upbjj" v-model="filter.upbjj">
+            <option value="">Semua UT-Daerah</option>
+            <option v-for="daerah in upbjjList" :key="daerah" :value="daerah">{{ daerah }}</option>
+          </select>
+        </div>
+
+        <!-- Dependent option: filter kategori baru muncul setelah UT-Daerah dipilih -->
+        <div class="field" v-if="filter.upbjj">
+          <label for="f-kategori">Kategori Mata Kuliah</label>
+          <select id="f-kategori" v-model="filter.kategori">
+            <option value="">Semua kategori di {{ filter.upbjj }}</option>
+            <option v-for="opsi in opsiKategori" :key="opsi.nama" :value="opsi.nama" :disabled="opsi.jumlah === 0">
+              {{ opsi.nama }} ({{ opsi.jumlah }})
+            </option>
+          </select>
+        </div>
+        <div class="field" v-else>
+          <label>Kategori Mata Kuliah</label>
+          <p class="petunjuk">Pilih UT-Daerah terlebih dahulu untuk memfilter kategori.</p>
+        </div>
+
+        <div class="field">
+          <label for="sort">Urutkan berdasarkan</label>
+          <div class="cari-bar">
+            <select id="sort" v-model="sort.kolom">
+              <option value="judul">Judul</option>
+              <option value="qty">Stok</option>
+              <option value="harga">Harga</option>
+            </select>
+            <button type="button" class="btn btn-garis" @click="balikArahSort"
+                    :title="sort.arah === 'asc' ? 'Naik (A-Z / kecil-besar)' : 'Turun (Z-A / besar-kecil)'">
+              {{ sort.arah === 'asc' ? '&#8593; Naik' : '&#8595; Turun' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-bawah">
+        <label class="checkbox">
+          <input type="checkbox" v-model="filter.reorder">
+          Tampilkan hanya yang perlu <strong>re-order</strong> (stok &lt; safety atau stok = 0)
+        </label>
+        <div>
+          <button type="button" class="btn btn-garis" @click="resetFilter" :disabled="!filterAktif">
+            &#8635; Reset Filter
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TABEL STOK ================= -->
+    <section class="kartu">
+      <div class="kartu-header">
+        <div>
+          <h2>Daftar Stok</h2>
+          <span class="redup">Menampilkan {{ stokTampil.length }} dari {{ stok.length }} bahan ajar</span>
+          <div v-show="filterAktif">
+            <span class="chip" v-if="filter.kataKunci">Cari: "{{ filter.kataKunci }}"</span>
+            <span class="chip" v-if="filter.upbjj">UT-Daerah: {{ filter.upbjj }}</span>
+            <span class="chip" v-if="filter.kategori">Kategori: {{ filter.kategori }}</span>
+            <span class="chip" v-if="filter.reorder">Perlu re-order</span>
+          </div>
+        </div>
+        <button type="button" class="btn btn-utama" @click="tampilForm = !tampilForm">
+          {{ tampilForm ? '&#10005; Tutup Formulir' : '+ Tambah Bahan Ajar' }}
+        </button>
+      </div>
+
+      <!-- ---------- Formulir tambah bahan ajar ---------- -->
+      <form v-show="tampilForm" class="kartu" style="background:#fbfcff" @submit.prevent="tambahBahanAjar" novalidate>
+        <h2>Tambah Bahan Ajar Baru</h2>
+        <div class="form-grid">
+          <div class="field" :class="{ error: errorTambah.kode }">
+            <label for="t-kode">Kode Mata Kuliah <span class="wajib">*</span></label>
+            <input id="t-kode" v-model.trim="form.kode" placeholder="mis. EKMA4117" maxlength="9">
+            <div class="pesan-error" v-if="errorTambah.kode">{{ errorTambah.kode }}</div>
+            <div class="petunjuk" v-else>4-5 huruf diikuti 4 angka.</div>
+          </div>
+          <div class="field" :class="{ error: errorTambah.judul }">
+            <label for="t-judul">Nama Mata Kuliah <span class="wajib">*</span></label>
+            <input id="t-judul" v-model.trim="form.judul" placeholder="mis. Pengantar Ekonomi">
+            <div class="pesan-error" v-if="errorTambah.judul">{{ errorTambah.judul }}</div>
+          </div>
+          <div class="field" :class="{ error: errorTambah.kategori }">
+            <label for="t-kategori">Kategori <span class="wajib">*</span></label>
+            <select id="t-kategori" v-model="form.kategori">
+              <option value="" disabled>-- Pilih kategori --</option>
+              <option v-for="k in kategoriList" :key="k" :value="k">{{ k }}</option>
+            </select>
+            <div class="pesan-error" v-if="errorTambah.kategori">{{ errorTambah.kategori }}</div>
+          </div>
+          <div class="field" :class="{ error: errorTambah.upbjj }">
+            <label for="t-upbjj">UT-Daerah <span class="wajib">*</span></label>
+            <select id="t-upbjj" v-model="form.upbjj">
+              <option value="" disabled>-- Pilih UT-Daerah --</option>
+              <option v-for="daerah in upbjjList" :key="daerah" :value="daerah">{{ daerah }}</option>
+            </select>
+            <div class="pesan-error" v-if="errorTambah.upbjj">{{ errorTambah.upbjj }}</div>
+          </div>
+          <div class="field" :class="{ error: errorTambah.lokasiRak }">
+            <label for="t-rak">Lokasi Rak <span class="wajib">*</span></label>
+            <input id="t-rak" v-model.trim="form.lokasiRak" placeholder="mis. R1-A5">
+            <div class="pesan-error" v-if="errorTambah.lokasiRak">{{ errorTambah.lokasiRak }}</div>
+            <div class="petunjuk" v-else>Format: R&lt;angka&gt;-&lt;huruf&gt;&lt;angka&gt;</div>
+          </div>
+          <div class="field" :class="{ error: errorTambah.harga }">
+            <label for="t-harga">Harga (Rp) <span class="wajib">*</span></label>
+            <input id="t-harga" type="number" min="0" step="500" v-model.number="form.harga" placeholder="mis. 65000">
+            <div class="pesan-error" v-if="errorTambah.harga">{{ errorTambah.harga }}</div>
+          </div>
+          <div class="field" :class="{ error: errorTambah.qty }">
+            <label for="t-qty">Jumlah Stok <span class="wajib">*</span></label>
+            <input id="t-qty" type="number" min="0" v-model.number="form.qty" placeholder="0">
+            <div class="pesan-error" v-if="errorTambah.qty">{{ errorTambah.qty }}</div>
+          </div>
+          <div class="field" :class="{ error: errorTambah.safety }">
+            <label for="t-safety">Safety Stock <span class="wajib">*</span></label>
+            <input id="t-safety" type="number" min="0" v-model.number="form.safety" placeholder="0">
+            <div class="pesan-error" v-if="errorTambah.safety">{{ errorTambah.safety }}</div>
+          </div>
+          <div class="field penuh">
+            <label for="t-catatan">Catatan (boleh berisi HTML sederhana)</label>
+            <textarea id="t-catatan" v-model="form.catatanHTML" placeholder="mis. <em>Edisi 2025</em>"></textarea>
+            <div class="petunjuk" v-if="form.catatanHTML">Pratinjau: <span v-html="form.catatanHTML"></span></div>
+          </div>
+        </div>
+        <div class="aksi-form">
+          <button type="button" class="btn btn-teks" @click="resetFormTambah">Kosongkan</button>
+          <button type="submit" class="btn btn-utama">Simpan Bahan Ajar</button>
+        </div>
+      </form>
+
+      <!-- ---------- Tabel daftar stok ---------- -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Mata Kuliah</th>
+              <th>Kategori</th>
+              <th>UT-Daerah</th>
+              <th>Lokasi Rak</th>
+              <th class="angka">Harga</th>
+              <th class="angka">Stok</th>
+              <th class="angka">Safety</th>
+              <th>Status</th>
+              <th>Catatan</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in stokTampil" :key="item.kode + '-' + item.upbjj"
+                :class="'baris-' + statusStok(item)">
+              <td>
+                <div class="kode">{{ item.kode }}</div>
+                <div>{{ item.judul }}</div>
+              </td>
+              <td>{{ item.kategori }}</td>
+              <td>{{ item.upbjj }}</td>
+              <td v-text="item.lokasiRak"></td>
+              <td class="angka">{{ formatRupiah(item.harga) }}</td>
+              <td class="angka"><strong>{{ item.qty }}</strong></td>
+              <td class="angka">{{ item.safety }}</td>
+              <td>
+                <span v-if="item.qty === 0" class="badge badge-kosong">&#10006; Kosong</span>
+                <span v-else-if="item.qty < item.safety" class="badge badge-menipis">&#9888; Menipis</span>
+                <span v-else class="badge badge-aman">&#10004; Aman</span>
+              </td>
+              <td v-html="item.catatanHTML"></td>
+              <td>
+                <button type="button" class="btn btn-garis btn-kecil" @click="bukaEdit(item)">&#9998; Edit</button>
+              </td>
+            </tr>
+            <tr v-if="stokTampil.length === 0">
+              <td colspan="10" class="kosong-data">
+                Tidak ada bahan ajar yang sesuai filter.
+                <a href="#" @click.prevent="resetFilter">Reset filter</a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="redup" style="margin-top:14px">
+        Data tersimpan di browser (localStorage).
+        <a href="#" @click.prevent="pulihkanData">Pulihkan data awal</a>
+      </p>
+    </section>
+
+    <!-- ================= MODAL EDIT STOK ================= -->
+    <div class="modal-latar" v-if="edit" @click.self="tutupEdit">
+      <form class="modal" @submit.prevent="simpanEdit" novalidate>
+        <h2>Edit Stok Bahan Ajar</h2>
+        <p class="redup" style="margin:0 0 16px">
+          <span class="kode">{{ edit.kode }}</span> &middot; {{ edit.judul }} &middot; UT-Daerah {{ edit.upbjj }}
+        </p>
+        <div class="form-grid">
+          <div class="field" :class="{ error: errorEdit.qty }">
+            <label for="e-qty">Jumlah Stok <span class="wajib">*</span></label>
+            <input id="e-qty" type="number" min="0" v-model.number="edit.qty">
+            <div class="pesan-error" v-if="errorEdit.qty">{{ errorEdit.qty }}</div>
+          </div>
+          <div class="field" :class="{ error: errorEdit.safety }">
+            <label for="e-safety">Safety Stock <span class="wajib">*</span></label>
+            <input id="e-safety" type="number" min="0" v-model.number="edit.safety">
+            <div class="pesan-error" v-if="errorEdit.safety">{{ errorEdit.safety }}</div>
+          </div>
+          <div class="field" :class="{ error: errorEdit.harga }">
+            <label for="e-harga">Harga (Rp) <span class="wajib">*</span></label>
+            <input id="e-harga" type="number" min="0" step="500" v-model.number="edit.harga">
+            <div class="pesan-error" v-if="errorEdit.harga">{{ errorEdit.harga }}</div>
+          </div>
+          <div class="field" :class="{ error: errorEdit.lokasiRak }">
+            <label for="e-rak">Lokasi Rak <span class="wajib">*</span></label>
+            <input id="e-rak" v-model.trim="edit.lokasiRak">
+            <div class="pesan-error" v-if="errorEdit.lokasiRak">{{ errorEdit.lokasiRak }}</div>
+          </div>
+          <div class="field penuh">
+            <label for="e-catatan">Catatan (HTML)</label>
+            <textarea id="e-catatan" v-model="edit.catatanHTML"></textarea>
+          </div>
+        </div>
+
+        <!-- Pratinjau status setelah perubahan -->
+        <p style="margin:14px 0 0">
+          Status setelah disimpan:
+          <span v-if="edit.qty === 0" class="badge badge-kosong">&#10006; Kosong</span>
+          <span v-else-if="edit.qty < edit.safety" class="badge badge-menipis">&#9888; Menipis</span>
+          <span v-else class="badge badge-aman">&#10004; Aman</span>
+        </p>
+
+        <div class="aksi-form">
+          <button type="button" class="btn btn-teks" @click="tutupEdit">Batal</button>
+          <button type="submit" class="btn btn-utama">Simpan Perubahan</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Notifikasi singkat -->
+    <div class="notifikasi" :class="{ gagal: notifikasi.gagal }" v-show="notifikasi.pesan">
+      {{ notifikasi.pesan }}
+    </div>
+  </main>
+
+  <footer>Tugas Praktik 2 &middot; STSI4209 Pemrograman Berbasis Web &middot; Universitas Terbuka</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.js"></script>
+  <script src="js/stok-app.js"></script>
+</body>
+</html>
